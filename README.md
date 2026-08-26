@@ -2,126 +2,129 @@
 
 # ⚔️ ClashRL
 
-### Clash Royale–inspired arena where neural agents draft, battle and evolve
+### Арена в духе Clash Royale, где нейросети собирают колоды, сражаются и развиваются
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.2%2B-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
-[![RL](https://img.shields.io/badge/RL-PPO%20Self--Play-8A2BE2)](#how-the-agent-learns)
-[![Cards](https://img.shields.io/badge/cards-44-F4BE41)](#card-roster)
+[![RL](https://img.shields.io/badge/RL-PPO%20Self--Play-8A2BE2)](#как-обучается-агент)
+[![Карты](https://img.shields.io/badge/карт-44-F4BE41)](#список-карт)
 
-**A clean-room two-player arena simulator for reinforcement-learning experiments.**  
-One checkpoint learns both an eight-round adversarial draft and real-time card deployment, then competes against historical versions of itself.
+**Независимый симулятор арены для экспериментов с обучением с подкреплением.**<br>
+Один чекпоинт учится проводить восьмираундовый состязательный драфт, размещать карты в реальном времени и сражаться с прошлыми версиями самого себя.
 
 </div>
 
 > [!IMPORTANT]
-> ClashRL is an independent research simulator. It is not affiliated with Supercell, does not use the official game engine or client, and does not claim frame-perfect card balance.
+> ClashRL — независимый исследовательский симулятор. Проект не связан с Supercell, не использует официальный движок или клиент игры и не претендует на точное воспроизведение актуального баланса карт.
 
-![ClashRL arena with AI policy panel](docs/screenshots/arena.png)
+![Арена ClashRL с панелью решений ИИ](docs/screenshots/arena.png)
 
-## Why this project is fun
+## Что интересного в проекте
 
-This is more than a tiny Gym-style environment. ClashRL includes the complete loop around an agent: simulation, legal-action masking, learned deck construction, PPO self-play, historical opponents, tournament evaluation, visual debugging and human play.
+Это не просто небольшой симулятор в стиле Gym. ClashRL охватывает весь цикл работы RL-агента: игровую среду, маскирование недопустимых действий, обучаемый сбор колоды, PPO self-play, исторических противников, турнирную оценку, визуальную отладку и игру против человека.
 
-- **44 cards** across troops, buildings and spells
-- **Learned keep/give draft** ending in two unique eight-card decks
-- **Two-headed actor–critic** with battle and draft policies in one checkpoint
-- **PPO self-play** across persistent parallel arenas
-- **Snapshot league** supplying diverse historical opponents
-- **Hall-of-fame tournaments** between immutable generations with Elo
-- **Rich mechanics:** bridges, air, splash, projectiles, shields, charge, spawners, knockback, stun, slow and death effects
-- **Visual tools:** animated draft, AI/human battle and a live training dashboard
-- **Headless tools:** evaluation, benchmarks, smoke checks and unit tests
+- **44 карты**: войска, здания и заклинания;
+- **обучаемый драфт KEEP/GIVE**, после которого игроки получают уникальные колоды из восьми карт;
+- **единая actor–critic модель** с отдельными головами для боя и драфта;
+- **PPO self-play** в нескольких постоянных параллельных аренах;
+- **лига снапшотов** с историческими версиями модели;
+- **турниры зала славы** между неизменяемыми поколениями с рейтингом Elo;
+- **разнообразные механики**: мосты, воздушные юниты, сплэш, снаряды, щиты, разгон, спавнеры, отбрасывание, оглушение, замедление и эффекты смерти;
+- **визуальные режимы**: анимированный драфт, бой ИИ или человека и живой дашборд обучения;
+- **headless-инструменты**: оценка моделей, бенчмарки, smoke-проверки и юнит-тесты.
 
-## See it in action
+## Как это выглядит
 
-| Learned draft | Training lab |
+| Обучаемый драфт | Лаборатория обучения |
 |---|---|
-| ![Keep/give draft animation](docs/screenshots/draft.png) | ![PPO and tournament dashboard](docs/screenshots/dashboard.png) |
+| ![Анимация драфта KEEP/GIVE](docs/screenshots/draft.png) | ![Дашборд PPO и турниров](docs/screenshots/dashboard.png) |
 
-These screenshots are rendered by the project itself. The procedural visuals keep the repository self-contained and focused on simulation rather than borrowed assets.
+Все скриншоты отрисованы самим проектом. Процедурная графика не требует заимствованных игровых ресурсов и позволяет сосредоточиться на симуляции и поведении моделей.
 
-## How a match works
+## Как проходит матч
 
-### 1. Draft eight cards
+### 1. Драфт восьми карт
 
-Each of eight rounds presents four cards to an alternating chooser. The policy selects an **ordered pair**: one card to keep and a different card to give away. The other two leave the pool. After eight rounds, each player has exactly eight unique cards.
+В каждом из восьми раундов активный игрок получает четыре карты. Политика выбирает **упорядоченную пару**: одну карту оставляет себе, а другую отдаёт сопернику. Две оставшиеся карты покидают пул. Право выбора чередуется, поэтому в конце оба игрока получают ровно по восемь уникальных карт.
 
-There are `4 × 3 = 12` draft actions per offer. The observation encodes the offer, partial decks, chooser, round and card identities. Draft choices receive the final match result, letting the agent learn deck synergy and which awkward counter to hand its opponent.
+Для каждого предложения существует `4 × 3 = 12` вариантов действия. Наблюдение содержит предложенные карты, обе частично собранные колоды, текущего игрока, номер раунда и идентификаторы карт. Решения на драфте получают итоговую награду за весь матч — модель может выучить синергии своей колоды и понять, какую неудобную карту выгодно отдать сопернику.
 
-### 2. Fight in continuous time
+### 2. Бой в непрерывном времени
 
-Players regenerate elixir, cycle four-card hands and deploy on their own side. Units acquire targets, route toward bridges, cross the river and attack troops, buildings or towers according to targeting rules. Crowns, overtime and hit-point tiebreaks decide the result.
+Игроки восстанавливают эликсир, прокручивают руку из четырёх карт и размещают юнитов на своей половине арены. Юниты выбирают цели, движутся к мостам, пересекают реку и атакуют войска, здания или башни в зависимости от своих правил наведения. Исход определяют короны, дополнительное время и сравнение оставшихся очков здоровья.
 
-Physics advances at `0.08 s`. Elixir accelerates through 1×, 2× and 3× phases, so late-game behavior differs from the opening.
+Физика обновляется с шагом `0,08 с`. Скорость восстановления эликсира последовательно переходит в режимы 1×, 2× и 3×, поэтому поведение агента в конце матча заметно отличается от начала.
 
-### 3. Decode the policy action
+### 3. Преобразование решения сети в действие
 
-The battle policy has **49 discrete actions**:
+Боевая политика использует **49 дискретных действий**:
 
-- action `0` waits;
-- four hand slots × twelve spatial bins provide `48` deployment choices;
-- an action mask removes unaffordable cards and illegal placements before sampling.
+- действие `0` — ожидание;
+- четыре слота руки × двенадцать пространственных ячеек дают `48` вариантов размещения;
+- маска действий исключает карты, на которые не хватает эликсира, и недопустимые позиции ещё до выбора действия.
 
-The battle observation has **3,207 values** covering towers, elixir, hands, time and fixed-size entity features. The same checkpoint consumes a separate **266-value draft observation**.
+Боевое наблюдение состоит из **3 207 значений**: состояние башен, эликсир, рука и колода, время и признаки фиксированного количества игровых объектов. Для драфта тот же чекпоинт принимает отдельное наблюдение из **266 значений**.
 
-## How the agent learns
+## Как обучается агент
 
 ```text
-24 persistent arenas
+24 постоянные арены
         │
-        ├── current policy vs current / league / hall-of-fame model
-        │                    └── learned eight-round draft
+        ├── текущая модель против текущей / лиги / чемпиона зала славы
+        │                         └── обучаемый драфт из восьми раундов
         ▼
-on-policy rollout (observations, masks, actions, rewards, values)
+on-policy rollout (наблюдения, маски, действия, награды, оценки)
         │
-        ├── GAE advantages + returns
+        ├── преимущества GAE + целевые возвраты
         ▼
-PPO epochs over shuffled minibatches
+несколько эпох PPO по перемешанным мини-батчам
         │
-        ├── clipped policy and value objectives
-        ├── entropy bonus
-        └── gradient clipping
+        ├── clipped policy objective
+        ├── clipped value objective
+        ├── бонус энтропии
+        └── ограничение нормы градиента
         ▼
-new checkpoint ──► snapshot league ──► tournament / Elo
+новый чекпоинт ──► лига снапшотов ──► турнир / Elo
 ```
 
-| Head | Input | Output | Purpose |
+| Голова модели | Размер входа | Размер выхода | Назначение |
 |---|---:|---:|---|
-| Battle actor | 3,207 | 49 logits | Wait or card/position deployment |
-| Battle critic | 3,207 | 1 value | Expected match return |
-| Draft actor | 266 | 12 logits | Ordered KEEP/GIVE pair |
-| Draft critic | 266 | 1 value | Current draft position |
+| Battle actor | 3 207 | 49 логитов | Ожидание или размещение карты в позиции |
+| Battle critic | 3 207 | 1 значение | Ожидаемый результат матча |
+| Draft actor | 266 | 12 логитов | Упорядоченный выбор KEEP/GIVE |
+| Draft critic | 266 | 1 значение | Оценка текущего состояния драфта |
 
-The battle backbone is a three-layer MLP with `LayerNorm` and `Tanh`; the draft backbone is a separate two-layer MLP. Orthogonal initialization and small policy-head gains start both policies near-uniform without coupling two different decision spaces.
+Боевая часть содержит трёхслойный MLP с `LayerNorm` и `Tanh`, а драфт использует отдельный двухслойный MLP. Ортогональная инициализация и малый коэффициент инициализации policy-голов позволяют обеим политикам начинать почти с равномерного распределения, не смешивая два разных пространства решений.
 
-### League vs tournament
+### Чем лига отличается от турнира
 
-- `league/` is a training population. Historical snapshots are sampled during self-play to reduce strategy collapse and forgetting.
-- `tournament/` is evaluation. Immutable contenders play every other active contender with learned draft enabled.
-- A tournament ranks **wins → points → Elo**. The persistent hall of fame uses **Elo first**, because lifetime wins favor older checkpoints.
-- The hall-of-fame champion may re-enter training as an opponent, linking evaluation back into learning.
+- `league/` — обучающая популяция. Прошлые снапшоты становятся противниками во время self-play, снижая риск забывания старых стратегий и коллапса к одной тактике.
+- `tournament/` — независимая оценка. Неизменяемые модели проводят круговой турнир друг с другом с включённым обучаемым драфтом.
+- В текущем турнире сортировка идёт по **победам → очкам → Elo**. Постоянный зал славы использует **Elo в первую очередь**, поскольку число побед давало бы преимущество старым моделям, сыгравшим больше матчей.
+- Чемпион зала славы может снова попасть в пул тренировочных противников, связывая оценку качества с дальнейшим обучением.
 
-In the development run, tournament #10 evaluated six generations over ten games each. Generation `g0000706_s0000385024` finished first with **7 wins, 2 draws, 1 loss and 1055.5 Elo**. Training artifacts are ignored by Git because checkpoints quickly grow to hundreds of megabytes.
+В тестовом запуске турнир №10 сравнил шесть поколений, каждое из которых сыграло десять матчей. Поколение `g0000706_s0000385024` заняло первое место с результатом **7 побед, 2 ничьи, 1 поражение и 1055,5 Elo**. Артефакты обучения не добавляются в Git, поскольку набор чекпоинтов быстро разрастается до сотен мегабайт.
 
-## Card roster
+## Список карт
 
-Stats are approximate and tuned for learning dynamics, not copied live balance values.
+Характеристики приблизительны и подобраны для динамики обучения, а не скопированы из актуального баланса оригинальной игры.
 
-| Archetype | Cards | Mechanics |
+| Архетип | Карты | Основные механики |
 |---|---|---|
-| Fighters & tanks | Knight, Giant, Mini P.E.K.K.A, Valkyrie, Barbarians, Royal Giant | melee, splash, building focus, ranged tank |
-| Ranged support | Archers, Musketeer, Bomber, Spear Goblins, Wizard, Dart Goblin, Bowler | projectiles, air targeting, splash, long range |
-| Swarms | Goblins, Skeletons, Guards, Skeleton Army | multi-unit deployment, shields, cycling |
-| Air | Minions, Mega Minion, Baby Dragon, Balloon, Bats, Minion Horde, Flying Machine | flight, air/ground targeting, death bomb |
-| Charge & pressure | Hog Rider, Prince, Dark Prince, Wall Breakers | building focus, charge, shield, suicide explosion |
-| Spawners & status | Witch, Ice Golem, Ice Spirit, Fire Spirit, Electro Wizard, Ice Wizard | spawning, death slow/stun, deploy pulse, on-hit status |
-| Buildings | Mortar, Goblin Hut, Cannon, Bomb Tower, Tombstone | lifetime, siege, spawning, death effects |
-| Spells | Fireball, Arrows, Zap, Giant Snowball, Rocket | area damage, tower scaling, stun, slow, knockback |
+| Бойцы и танки | Knight, Giant, Mini P.E.K.K.A, Valkyrie, Barbarians, Royal Giant | ближний бой, сплэш, атака зданий, дальнобойный танк |
+| Стрелковая поддержка | Archers, Musketeer, Bomber, Spear Goblins, Wizard, Dart Goblin, Bowler | снаряды, воздушные цели, сплэш, большая дальность |
+| Рои | Goblins, Skeletons, Guards, Skeleton Army | размещение группы, щиты, быстрое прокручивание колоды |
+| Воздушные юниты | Minions, Mega Minion, Baby Dragon, Balloon, Bats, Minion Horde, Flying Machine | полёт, воздушные и наземные цели, бомба после смерти |
+| Натиск и разгон | Hog Rider, Prince, Dark Prince, Wall Breakers | атака зданий, разгон, щит, взрыв при атаке |
+| Спавнеры и статусы | Witch, Ice Golem, Ice Spirit, Fire Spirit, Electro Wizard, Ice Wizard | призыв юнитов, замедление и стан после смерти, эффект высадки, статусы при попадании |
+| Здания | Mortar, Goblin Hut, Cannon, Bomb Tower, Tombstone | ограниченное время жизни, осада, спавн, эффекты разрушения |
+| Заклинания | Fireball, Arrows, Zap, Giant Snowball, Rocket | урон по площади, особый урон башням, стан, замедление, отбрасывание |
 
-All cards are immutable dataclasses in `clashrl/cards.py`: hit points, damage, speed, range, interval, count, radius, targets and special effects remain visible and easy to rebalance.
+Все карты описаны неизменяемыми dataclass-объектами в `clashrl/cards.py`. Здоровье, урон, скорость, дальность, интервал атаки, количество юнитов, радиус, тип цели и параметры особых эффектов находятся в одном месте и легко меняются для экспериментов с балансом.
 
-## Installation
+## Установка
+
+Требуется Python 3.10 или новее. Рекомендуется использовать виртуальное окружение.
 
 ```bash
 git clone https://github.com/Mobzya/clash-rl.git
@@ -133,26 +136,26 @@ pip install -e .
 ./run_verify.sh
 ```
 
-On Arch/EndeavourOS, if a `pygame-ce` wheel is unavailable:
+На Arch Linux или EndeavourOS зависимости SDL понадобятся только в том случае, если готовый wheel для `pygame-ce` недоступен:
 
 ```bash
 sudo pacman -S --needed base-devel pkg-config sdl2 sdl2_ttf sdl2_image sdl2_mixer portmidi
 pip install --upgrade pygame-ce
 ```
 
-## Quick start
+## Быстрый старт
 
 ```bash
-python -m clashrl doctor                 # dependency check
-python -m clashrl smoke --steps 800      # short headless simulation
-./run_demo.sh                            # AI vs random + draft
-./run_play.sh                            # human vs latest checkpoint
-./run_training_ui.sh                     # trainer + dashboard
+python -m clashrl doctor                 # проверка окружения
+python -m clashrl smoke --steps 800      # короткая headless-симуляция
+./run_demo.sh                            # ИИ против случайного бота + драфт
+./run_play.sh                            # человек против последнего чекпоинта
+./run_training_ui.sh                     # обучение вместе с дашбордом
 ```
 
-No trained weights are committed. Create an untrained checkpoint with `python -m clashrl init`, or put a compatible checkpoint at `runs/v31/latest.pt`.
+Обученные веса не хранятся в репозитории. Создайте начальный чекпоинт командой `python -m clashrl init` или поместите совместимую модель в `runs/v31/latest.pt`.
 
-### Recommended training
+### Рекомендуемый запуск обучения
 
 ```bash
 python -m clashrl train \
@@ -167,13 +170,13 @@ python -m clashrl train \
   --tournament-max-models 6
 ```
 
-`--workers 0` is the safe default because observation IPC can outweigh parallel physics. Benchmark your machine before changing it:
+`--workers 0` — безопасное значение по умолчанию: передача наблюдений между процессами может оказаться дороже сэкономленного на физике времени. Перед изменением параметра измерьте производительность на своей машине:
 
 ```bash
 python -m clashrl benchmark --workers 0 2 4 auto --num-envs 24 --steps 2048
 ```
 
-Useful commands:
+Другие полезные команды:
 
 ```bash
 python -m clashrl watch --a latest --b random --speed 4
@@ -183,48 +186,48 @@ python -m clashrl tournament --run runs/v31 --games-per-pair 2 --max-models 6
 python -m clashrl leaderboard --run runs/v31 --current
 ```
 
-## Controls
+## Управление
 
-| Scene | Controls |
+| Режим | Клавиши и действия |
 |---|---|
-| Human draft | click KEEP, click GIVE, `Enter` confirm, `Backspace` reset |
-| Arena | `Space` pause, `+/-` speed, `R` ranges, `N` names, `Esc` exit |
-| Human battle | `1`–`4` select card, then click a legal arena position |
-| Dashboard | `+/-` smoothing window, `Esc` exit |
+| Драфт человека | нажать KEEP, затем GIVE; `Enter` — подтвердить; `Backspace` — сбросить выбор |
+| Просмотр арены | `Space` — пауза; `+/-` — скорость; `R` — радиусы атак; `N` — имена; `Esc` — выход |
+| Бой человека | `1`–`4` — выбрать карту, затем нажать на допустимую точку арены |
+| Дашборд | `+/-` — окно сглаживания; `Esc` — выход |
 
-## Project map
+## Структура проекта
 
 ```text
 clashrl/
-├── core.py          physics, targeting, projectiles and status effects
-├── env.py           observations, rewards, action decoding and masks
-├── cards.py         card definitions and deck archetypes
-├── draft.py         keep/give state machine
-├── model.py         battle + draft actor–critic
-├── ppo.py           rollout collection and PPO updates
-├── league.py        historical self-play snapshots
-├── tournament.py    contenders, round robin and Elo
-├── parallel.py      optional shared-memory workers
-├── evaluate.py      headless drafted evaluation
-├── visualize.py     draft, arena and human-play UI
-├── dashboard.py     live training and tournament charts
-└── cli.py           command-line interface
+├── core.py          физика, выбор целей, снаряды и статусные эффекты
+├── env.py           наблюдения, награды, декодирование и маски действий
+├── cards.py         определения карт и архетипы колод
+├── draft.py         конечный автомат драфта KEEP/GIVE
+├── model.py         actor–critic для боя и драфта
+├── ppo.py           сбор rollout и обновления PPO
+├── league.py        исторические снапшоты для self-play
+├── tournament.py    участники, круговой турнир и Elo
+├── parallel.py      опциональные shared-memory воркеры
+├── evaluate.py      headless-оценка с драфтом
+├── visualize.py     интерфейс драфта, арены и игры человека
+├── dashboard.py     графики обучения и турниров
+└── cli.py           интерфейс командной строки
 ```
 
-## Testing
+## Тестирование
 
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-The suite covers combat, towers, bridges, targeting, draft invariants, masks, PPO rollout/update, tournament persistence and every procedural render branch.
+Тесты проверяют боевую систему, башни, мосты, выбор целей, инварианты драфта, маски действий, сбор rollout и обновление PPO, сохранение турниров и все ветви процедурного рендера.
 
-## Scope and limitations
+## Ограничения
 
-ClashRL is intentionally compact. Navigation and collision are approximations; champions, evolutions and many official card-specific exceptions are absent. A policy can become strong **inside this simulator** without transferring to the commercial game. That separation keeps the environment inspectable, fast, offline and safe to modify.
+ClashRL намеренно остаётся компактным. Навигация и столкновения приблизительны; чемпионы, эволюции и многие особые правила официальных карт не реализованы. Политика может стать очень сильной **внутри этого симулятора**, но это не означает автоматического переноса навыков в коммерческую игру. Благодаря такому разделению среда остаётся прозрачной, быстрой, полностью офлайн и удобной для изменений.
 
 ---
 
 <div align="center">
-Built as a playground for self-play, emergent deck-building and surprisingly dramatic neural decisions.
+Песочница для self-play, неожиданных колод и удивительно драматичных решений маленьких нейросетей.
 </div>
