@@ -124,8 +124,8 @@ All cards are immutable dataclasses in `clashrl/cards.py`: hit points, damage, s
 ## Installation
 
 ```bash
-git clone <your-repository-url>
-cd clash_rl_project
+git clone https://github.com/Mobzya/clash-rl.git
+cd clash-rl
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
