@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clashrl"
+version = "0.3.1"
+description = "Clash-Royale-inspired self-play RL simulator with animated learned draft, PPO league training, model tournaments and pygame visualization"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.26", "torch>=2.2", "pygame-ce>=2.5.6"]
+
+[project.scripts]
+clashrl = "clashrl.cli:main"
+
+[tool.setuptools]
+packages = ["clashrl"]
